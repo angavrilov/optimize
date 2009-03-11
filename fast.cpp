@@ -3,6 +3,8 @@
 #include <sys/timeb.h>
 
 #define L2_CACHE (2*1048576)
+#define TLB_SIZE 256
+#define PAGE_SIZE 4096
 #define MIN(a,b) (((a)<(b))?(a):(b))
 
 double GetResult(double * LeftMatrix, double * RightMatrix, int N, int L, int M)
@@ -22,7 +24,7 @@ double GetResult(double * LeftMatrix, double * RightMatrix, int N, int L, int M)
 	int rightindex=0;
 	double sum=0.0;
 
-	int kstride = L2_CACHE*3/L/sizeof(double)/4;
+	int kstride = MIN(L2_CACHE*3/L/sizeof(double)/4, TLB_SIZE*PAGE_SIZE*3/L/sizeof(double)/4);
 
 	for(k0=0;k0<L;k0+=kstride) {
 		ktop = MIN(k0+kstride,L);
