@@ -17,24 +17,19 @@ double GetResult(double * LeftMatrix, double * RightMatrix, int N, int L, int M)
 	int leftindex=0;
 	int rightindex=0;
 	double sum=0.0;
-	double Result=0.0;
 
 	for(i=0;i<N;i++)
 	{
-		for(j=0;j<M;j++)
+		for(k=0;k<L;k++)
 		{
-			sum=0.0;
-			for(k=0;k<L;k++)
-			{
-				leftindex=i*L+k;
-				rightindex=k*M+j;
-				sum+=LeftMatrix[leftindex]*RightMatrix[rightindex];
-			}
-			Result+=sum;
+			double left = LeftMatrix[i*L+k];
+			double *pright = RightMatrix + k*M;
+			for(j=0;j<M;j++)
+				sum+=left*pright[j];
 		}
 	}
 
-	return(Result);
+	return sum;
 }
 
 int main(int argc, char* argv[])
