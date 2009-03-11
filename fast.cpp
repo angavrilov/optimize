@@ -41,9 +41,9 @@ int main(int argc, char* argv[])
 {
 	struct timeb tstartstruct,tstopstruct;
 
-	int N1=1200;
-	int M1=1300;
-	int L1=1400;
+	int N1=2200;
+	int M1=2300;
+	int L1=2400;
 	int i=0;
 	double res=0;
 	int seconds=0;
