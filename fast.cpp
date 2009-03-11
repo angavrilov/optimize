@@ -6,6 +6,10 @@
 #include <emmintrin.h>
 #endif
 
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
 #define L2_CACHE (2*1048576)
 #define TLB_SIZE 256
 #define PAGE_SIZE 4096
@@ -34,11 +38,18 @@ double GetResult(double * LeftMatrix, double * RightMatrix, int N, int L, int M)
 	int MX = (M&1) ? M : 0;
 	int M2 = M & ~1;
 #endif
+
 	int kstride = MIN(L2_CACHE*3/L/sizeof(double)/4, TLB_SIZE*PAGE_SIZE*3/L/sizeof(double)/4);
 
+#pragma omp parallel private(i, j, k, k0, ktop, sum2, temp) reduction(+: sum)
+    {
 	for(k0=0;k0<L;k0+=kstride) {
 		ktop = MIN(k0+kstride,L);
+#ifdef _OPENMP
+		for(i=omp_get_thread_num();i<N;i+=omp_get_num_threads())
+#else
 		for(i=0;i<N;i++)
+#endif
 		{
 			for(k=k0;k<ktop;k++)
 			{
@@ -67,6 +78,7 @@ double GetResult(double * LeftMatrix, double * RightMatrix, int N, int L, int M)
 	_mm_storeu_pd(temp, sum2);
 	sum += temp[0]+temp[1];
 #endif
+    }
 
 	return sum;
 }
