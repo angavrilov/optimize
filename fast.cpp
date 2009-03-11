@@ -2,6 +2,9 @@
 #include <stdlib.h>
 #include <sys/timeb.h>
 
+#define L2_CACHE (2*1048576)
+#define MIN(a,b) (((a)<(b))?(a):(b))
+
 double GetResult(double * LeftMatrix, double * RightMatrix, int N, int L, int M)
 {
 	// матрица LeftMatrix хранится по строкам
@@ -14,18 +17,24 @@ double GetResult(double * LeftMatrix, double * RightMatrix, int N, int L, int M)
 	int i=0;
 	int j=0;
 	int k=0;
+	int k0,ktop;
 	int leftindex=0;
 	int rightindex=0;
 	double sum=0.0;
 
-	for(i=0;i<N;i++)
-	{
-		for(k=0;k<L;k++)
+	int kstride = L2_CACHE*3/L/sizeof(double)/4;
+
+	for(k0=0;k0<L;k0+=kstride) {
+		ktop = MIN(k0+kstride,L);
+		for(i=0;i<N;i++)
 		{
-			double left = LeftMatrix[i*L+k];
-			double *pright = RightMatrix + k*M;
-			for(j=0;j<M;j++)
-				sum+=left*pright[j];
+			for(k=k0;k<ktop;k++)
+			{
+				double left = LeftMatrix[i*L+k];
+				double *pright = RightMatrix + k*M;
+				for(j=0;j<M;j++)
+					sum+=left*pright[j];
+			}
 		}
 	}
 
