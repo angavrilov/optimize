@@ -32,7 +32,7 @@ double GetResult(double * LeftMatrix, double * RightMatrix, int N, int L, int M)
 	double temp[2];
 	__m128d sum2 = _mm_set1_pd(0.0);
 	int MX = (M&1) ? M : 0;
-	M &= ~1;
+	int M2 = M & ~1;
 #endif
 	int kstride = MIN(L2_CACHE*3/L/sizeof(double)/4, TLB_SIZE*PAGE_SIZE*3/L/sizeof(double)/4);
 
@@ -43,13 +43,16 @@ double GetResult(double * LeftMatrix, double * RightMatrix, int N, int L, int M)
 			for(k=k0;k<ktop;k++)
 			{
 				double left = LeftMatrix[i*L+k];
-#ifdef __SSE2__
-				__m128d left2 = _mm_set1_pd(left);
-#endif
 				double *pright = RightMatrix + k*M;
 #ifdef __SSE2__
-				for(j=0;j<M;j+=2)
-					sum2 = _mm_add_pd(sum2, _mm_mul_pd(left2, _mm_loadu_pd(pright+j)));
+				__m128d left2 = _mm_set1_pd(left);
+				if (((long)pright)&0xF) {
+					for(j=0;j<M2;j+=2)
+						sum2 = _mm_add_pd(sum2, _mm_mul_pd(left2, _mm_loadu_pd(pright+j)));
+				} else {
+					for(j=0;j<M2;j+=2)
+						sum2 = _mm_add_pd(sum2, _mm_mul_pd(left2, _mm_load_pd(pright+j)));
+				}
 				if (MX)
 					sum += left*pright[MX-1];
 #else
