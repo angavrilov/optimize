@@ -22,6 +22,7 @@
 #endif
 #endif
 
+#define L1_CACHE 32768
 #define L2_CACHE (2*1048576)
 #define TLB_SIZE 256
 #define PAGE_SIZE 4096
@@ -51,6 +52,7 @@ double GetResult(double * LeftMatrix, double * RightMatrix, int N, int L, int M)
 
 	int kstride = MIN(L2_CACHE*3/L/sizeof(double)/4, TLB_SIZE*PAGE_SIZE*3/L/sizeof(double)/4);
 	int istride = TLB_SIZE/4;
+	int jstride = L1_CACHE*3/sizeof(double)/4;
 
 #pragma omp parallel private(i, j, k, k0, ktop) reduction(+: sum)
     {
@@ -70,42 +72,50 @@ double GetResult(double * LeftMatrix, double * RightMatrix, int N, int L, int M)
 		for(int i0=0;i0<N;i0+=istride)
 #endif
 		{
-			int itop = MIN(i0+istride,N);
-			for(k=k0;k<ktop;k++)
-			{
-			    double *pright = RightMatrix + k*M;
+		    int itop = MIN(i0+istride,N);
+		    for(k=k0;k<ktop;k++)
+		    {
+			for (int j0=0;j0<M;j0+=jstride) {
+#ifdef __SSE2__
+			    int jtop = MIN(jstride,M2-j0);
+			    int MX2 = (jtop < jstride ? MX-j0 : 0);
+#else
+			    int jtop = MIN(jstride,M-j0);
+#endif
+			    double *pright = RightMatrix + k*M + j0;
 			    for(i=i0;i<itop;i++)
 			    {
 				double left = LeftMatrix[i*L+k];
 #ifdef __SSE2__
 				__m128d left2 = _mm_set1_pd(left);
 				if (((long)pright)&0xF) {
-					for(j=0;j<M2-6;j+=8) {
+					for(j=0;j<jtop-6;j+=8) {
 						sum2 = _mm_add_pd(sum2, _mm_mul_pd(left2, _mm_loadu_pd(pright+j)));
 						sum3 = _mm_add_pd(sum3, _mm_mul_pd(left2, _mm_loadu_pd(pright+j+2)));
 						sum4 = _mm_add_pd(sum4, _mm_mul_pd(left2, _mm_loadu_pd(pright+j+4)));
 						sum5 = _mm_add_pd(sum5, _mm_mul_pd(left2, _mm_loadu_pd(pright+j+6)));
 					}
-					for(;j<M2;j+=2)
+					for(;j<jtop;j+=2)
 						sum2 = _mm_add_pd(sum2, _mm_mul_pd(left2, _mm_loadu_pd(pright+j)));
 				} else {
-					for(j=0;j<M2-6;j+=8) {
+					for(j=0;j<jtop-6;j+=8) {
 						sum2 = _mm_add_pd(sum2, _mm_mul_pd(left2, _mm_load_pd(pright+j)));
 						sum3 = _mm_add_pd(sum3, _mm_mul_pd(left2, _mm_load_pd(pright+j+2)));
 						sum4 = _mm_add_pd(sum4, _mm_mul_pd(left2, _mm_load_pd(pright+j+4)));
 						sum5 = _mm_add_pd(sum5, _mm_mul_pd(left2, _mm_load_pd(pright+j+6)));
 					}
-					for(;j<M2;j+=2)
+					for(;j<jtop;j+=2)
 						sum2 = _mm_add_pd(sum2, _mm_mul_pd(left2, _mm_load_pd(pright+j)));
 				}
-				if (MX)
-					sum += left*pright[MX-1];
+				if (MX2)
+					sum += left*pright[MX2-1];
 #else
-				for(j=0;j<M;j++)
+				for(j=0;j<jtop;j++)
 					sum+=left*pright[j];
 #endif
 			    }
 			}
+		    }
 		}
 	}
 
