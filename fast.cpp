@@ -64,21 +64,21 @@ double GetResult(double * LeftMatrix, double * RightMatrix, int N, int L, int M)
 #ifdef __SSE2__
 				__m128d left2 = _mm_set1_pd(left);
 				if (((long)pright)&0xF) {
-					for(j=0;j<M2;j+=6) {
+					for(j=0;j<M2-4;j+=6) {
 						sum2 = _mm_add_pd(sum2, _mm_mul_pd(left2, _mm_loadu_pd(pright+j)));
-						if ((j+2)>=M2) break;
 						sum3 = _mm_add_pd(sum3, _mm_mul_pd(left2, _mm_loadu_pd(pright+j+2)));
-						if ((j+4)>=M2) break;
 						sum4 = _mm_add_pd(sum4, _mm_mul_pd(left2, _mm_loadu_pd(pright+j+4)));
 					}
+					for(;j<M2;j+=2)
+						sum2 = _mm_add_pd(sum2, _mm_mul_pd(left2, _mm_loadu_pd(pright+j)));
 				} else {
-					for(j=0;j<M2;j+=6) {
+					for(j=0;j<M2-4;j+=6) {
 						sum2 = _mm_add_pd(sum2, _mm_mul_pd(left2, _mm_load_pd(pright+j)));
-						if ((j+2)>=M2) break;
 						sum3 = _mm_add_pd(sum3, _mm_mul_pd(left2, _mm_load_pd(pright+j+2)));
-						if ((j+4)>=M2) break;
 						sum4 = _mm_add_pd(sum4, _mm_mul_pd(left2, _mm_load_pd(pright+j+4)));
 					}
+					for(;j<M2;j+=2)
+						sum2 = _mm_add_pd(sum2, _mm_mul_pd(left2, _mm_load_pd(pright+j)));
 				}
 				if (MX)
 					sum += left*pright[MX-1];
