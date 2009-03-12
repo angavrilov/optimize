@@ -2,6 +2,9 @@
 #include <stdlib.h>
 #include <sys/timeb.h>
 
+#define KSTRIDE 512
+#define MIN(a,b) (((a)<(b))?(a):(b))
+
 double GetResult(double * LeftMatrix, double * RightMatrix, int N, int L, int M)
 {
 	// матрица LeftMatrix хранится по строкам
@@ -11,30 +14,30 @@ double GetResult(double * LeftMatrix, double * RightMatrix, int N, int L, int M)
 	// M ― число столбцов RighttMatrix
 	// Возвращаемый результат ― сумма всех элементов произведения LeftMatrix на RightMatrix слева направо
 
-	int i=0;
-	int j=0;
-	int k=0;
+	int i,j,k,k0,ktop;
 	double sum=0.0;
+	double jrows[KSTRIDE];
 
-	double *jrows = new double[L];
+	for(k0=0;k0<L;k0+=KSTRIDE) {
+		ktop = MIN(KSTRIDE,L-k0);
 
-	for(k=0;k<L;k++) {
-		double jsum = 0.0;
-		double *pright = RightMatrix + k*M;
-		for(j=0;j<M;j++)
-			jsum+=pright[j];
-		jrows[k]=jsum;
-	}
+		for(k=0;k<ktop;k++) {
+			double jsum = 0.0;
+			double *pright = RightMatrix + (k0+k)*M;
+			for(j=0;j<M;j++)
+				jsum+=pright[j];
+			jrows[k]=jsum;
+		}
 
-	for(i=0;i<N;i++)
-	{
-		for(k=0;k<L;k++)
+		for(i=0;i<N;i++)
 		{
-			sum += LeftMatrix[i*L+k]*jrows[k];
+			double *pleft = LeftMatrix + i*L + k0;
+			for(k=0;k<ktop;k++)
+			{
+				sum += pleft[k]*jrows[k];
+			}
 		}
 	}
-
-	delete jrows;
 
 	return sum;
 }
