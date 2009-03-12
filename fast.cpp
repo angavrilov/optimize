@@ -40,21 +40,25 @@ double GetResult(double * LeftMatrix, double * RightMatrix, int N, int L, int M)
 #endif
 
 	int kstride = MIN(L2_CACHE*3/L/sizeof(double)/4, TLB_SIZE*PAGE_SIZE*3/L/sizeof(double)/4);
+	int istride = TLB_SIZE/4;
 
 #pragma omp parallel private(i, j, k, k0, ktop, sum2, temp) reduction(+: sum)
     {
 	for(k0=0;k0<L;k0+=kstride) {
 		ktop = MIN(k0+kstride,L);
 #ifdef _OPENMP
-		for(i=omp_get_thread_num();i<N;i+=omp_get_num_threads())
+		for(int i0=omp_get_thread_num()*istride;i0<N;i0+=omp_get_num_threads()*istride)
 #else
-		for(i=0;i<N;i++)
+		for(int i0=0;i0<N;i0+=istride)
 #endif
 		{
+			int itop = MIN(i0+istride,N);
 			for(k=k0;k<ktop;k++)
 			{
+			    double *pright = RightMatrix + k*M;
+			    for(i=i0;i<itop;i++)
+			    {
 				double left = LeftMatrix[i*L+k];
-				double *pright = RightMatrix + k*M;
 #ifdef __SSE2__
 				__m128d left2 = _mm_set1_pd(left);
 				if (((long)pright)&0xF) {
@@ -70,6 +74,7 @@ double GetResult(double * LeftMatrix, double * RightMatrix, int N, int L, int M)
 				for(j=0;j<M;j++)
 					sum+=left*pright[j];
 #endif
+			    }
 			}
 		}
 	}
