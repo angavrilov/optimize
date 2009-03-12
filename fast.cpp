@@ -35,6 +35,8 @@ double GetResult(double * LeftMatrix, double * RightMatrix, int N, int L, int M)
 #ifdef __SSE2__
 	double temp[2];
 	__m128d sum2 = _mm_set1_pd(0.0);
+	__m128d sum3 = _mm_set1_pd(0.0);
+	__m128d sum4 = _mm_set1_pd(0.0);
 	int MX = (M&1) ? M : 0;
 	int M2 = M & ~1;
 #endif
@@ -42,7 +44,7 @@ double GetResult(double * LeftMatrix, double * RightMatrix, int N, int L, int M)
 	int kstride = MIN(L2_CACHE*3/L/sizeof(double)/4, TLB_SIZE*PAGE_SIZE*3/L/sizeof(double)/4);
 	int istride = TLB_SIZE/4;
 
-#pragma omp parallel private(i, j, k, k0, ktop, sum2, temp) reduction(+: sum)
+#pragma omp parallel private(i, j, k, k0, ktop, sum2, sum3, sum4, temp) reduction(+: sum)
     {
 	for(k0=0;k0<L;k0+=kstride) {
 		ktop = MIN(k0+kstride,L);
@@ -62,11 +64,21 @@ double GetResult(double * LeftMatrix, double * RightMatrix, int N, int L, int M)
 #ifdef __SSE2__
 				__m128d left2 = _mm_set1_pd(left);
 				if (((long)pright)&0xF) {
-					for(j=0;j<M2;j+=2)
+					for(j=0;j<M2;j+=6) {
 						sum2 = _mm_add_pd(sum2, _mm_mul_pd(left2, _mm_loadu_pd(pright+j)));
+						if ((j+2)>=M2) break;
+						sum3 = _mm_add_pd(sum3, _mm_mul_pd(left2, _mm_loadu_pd(pright+j+2)));
+						if ((j+4)>=M2) break;
+						sum4 = _mm_add_pd(sum4, _mm_mul_pd(left2, _mm_loadu_pd(pright+j+4)));
+					}
 				} else {
-					for(j=0;j<M2;j+=2)
+					for(j=0;j<M2;j+=6) {
 						sum2 = _mm_add_pd(sum2, _mm_mul_pd(left2, _mm_load_pd(pright+j)));
+						if ((j+2)>=M2) break;
+						sum3 = _mm_add_pd(sum3, _mm_mul_pd(left2, _mm_load_pd(pright+j+2)));
+						if ((j+4)>=M2) break;
+						sum4 = _mm_add_pd(sum4, _mm_mul_pd(left2, _mm_load_pd(pright+j+4)));
+					}
 				}
 				if (MX)
 					sum += left*pright[MX-1];
@@ -80,7 +92,7 @@ double GetResult(double * LeftMatrix, double * RightMatrix, int N, int L, int M)
 	}
 
 #ifdef __SSE2__
-	_mm_storeu_pd(temp, sum2);
+	_mm_storeu_pd(temp, _mm_add_pd(_mm_add_pd(sum2,sum3),sum4));
 	sum += temp[0]+temp[1];
 #endif
     }
