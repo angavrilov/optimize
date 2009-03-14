@@ -23,6 +23,7 @@ double GetResult(double * LeftMatrix, double * RightMatrix, int N, int L, int M)
 	int j=0;
 	int k=0;
 	double Result=0.0;
+	double right[VALS_PER_PAGE];
 	
 	int jstride = VALS_PER_PAGE;
 	int istride = MIN(L2_CACHE*3/sizeof(double)/(jstride+L)/4, TLB_SIZE*3/4/2);
@@ -45,12 +46,14 @@ double GetResult(double * LeftMatrix, double * RightMatrix, int N, int L, int M)
 					for(k=0;k<L;k++)
 					{
 						double *pright = RightMatrix + k*M + j0;
+						for(j=0;j<jtop;j++)
+							right[j] = pright[j];
 						for(i=0;i<itop;i++)
 						{
 							double left = LeftMatrix[(i+i0)*L+k];
 							double *psums = sums + i*jtop;
 							for(j=0;j<jtop;j++)
-								psums[j] += left*pright[j];
+								psums[j] += left*right[j];
 						}
 					}
 					for(i=0;i<itop*jtop;i++)
