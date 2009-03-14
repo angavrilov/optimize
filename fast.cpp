@@ -66,6 +66,10 @@ double GetResult(double * LeftMatrix, double * RightMatrix, int N, int L, int M)
 					for(k=0;k<L;k++)
 					{
 						double *pright = RightMatrix + k*M + j0;
+#ifdef __SSE2__						
+						_mm_prefetch(sums, _MM_HINT_T0);
+						_mm_prefetch(sums+8, _MM_HINT_T0);
+#endif
 						for(j=0;j<jtop;j++)
 							right[j] = pright[j];
 #ifdef __SSE2__						
@@ -83,10 +87,12 @@ double GetResult(double * LeftMatrix, double * RightMatrix, int N, int L, int M)
 									 _mm_add_pd(_mm_load_pd(psums+j+d),\
 									 _mm_mul_pd(left2, _mm_load_pd(right+j+d))))
 							for(j=0;j<jstep-14;j+=16) {
+								_mm_prefetch(psums+j+16, _MM_HINT_T0);
 								COMPUTE(0);
 								COMPUTE(2);
 								COMPUTE(4);
 								COMPUTE(6);
+								_mm_prefetch(psums+j+24, _MM_HINT_T0);
 								COMPUTE(8);
 								COMPUTE(10);
 								COMPUTE(12);
