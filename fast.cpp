@@ -110,8 +110,16 @@ double GetResult(double * LeftMatrix, double * RightMatrix, int N, int L, int M)
 				if (MX2)
 					sum += left*pright[MX2-1];
 #else
-				for(j=0;j<jtop;j++)
-					sum+=left*pright[j];
+				double s1=0,s2=0,s3=0,s4=0;
+				for(j=0;j<jtop-3;j+=4) {
+					s1 += left*pright[j];
+					s2 += left*pright[j+1];
+					s3 += left*pright[j+2];
+					s4 += left*pright[j+3];
+				}
+				for(;j<jtop;j++)
+					sum += left*pright[j];
+				sum += s1 + s2 + s3 + s4;
 #endif
 			    }
 			}
