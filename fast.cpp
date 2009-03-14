@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 #include <sys/timeb.h>
 
 double GetResult(double * LeftMatrix, double * RightMatrix, int N, int L, int M)
@@ -30,7 +31,7 @@ double GetResult(double * LeftMatrix, double * RightMatrix, int N, int L, int M)
 				rightindex=k*M+j;
 				sum+=LeftMatrix[leftindex]*RightMatrix[rightindex];
 			}
-			Result+=sum;
+			Result+=fabs(sum);
 		}
 	}
 
