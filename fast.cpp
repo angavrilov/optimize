@@ -1,14 +1,32 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <malloc.h>
 #include <sys/timeb.h>
 
+#ifdef __SSE2__
+#include <xmmintrin.h>
+#include <emmintrin.h>
+#else
+#ifndef NO_SSE
+#error Please enable SSE2
+#endif
+#endif
+ 
 #define L1_CACHE 32768
 #define L2_CACHE (2*1048576)
 #define TLB_SIZE 256
 #define VALS_PER_LINE 8
 #define VALS_PER_PAGE 512
 #define MIN(a,b) (((a)<(b))?(a):(b))
+
+#ifdef __GNUC__
+#define ALIGN16(x) x __attribute__((aligned(16)))
+#define _aligned_alloc(size,alignment) memalign(alignment,size)
+#define _aligned_free(ptr) free(ptr)
+#else
+#define ALIGN16(x) __declspec(align(16)) x
+#endif
 
 double GetResult(double * LeftMatrix, double * RightMatrix, int N, int L, int M)
 {
@@ -23,7 +41,7 @@ double GetResult(double * LeftMatrix, double * RightMatrix, int N, int L, int M)
 	int j=0;
 	int k=0;
 	double Result=0.0;
-	double right[VALS_PER_PAGE];
+	ALIGN16(double right[VALS_PER_PAGE]);
 	
 	int jstride = VALS_PER_PAGE;
 	int istride = MIN(L2_CACHE*3/sizeof(double)/(jstride+L)/4, TLB_SIZE*3/4/2);
@@ -31,8 +49,8 @@ double GetResult(double * LeftMatrix, double * RightMatrix, int N, int L, int M)
 	if (istride > N) istride = N;
 	if (jstride > M) jstride = M;
 	
-	double *sums = new double[istride*jstride];
-	
+	double *sums = (double*)_aligned_alloc(istride*jstride*sizeof(double),16);
+		
 	{
 		{
 			for(int i0=0;i0<N;i0+=istride)
@@ -41,29 +59,55 @@ double GetResult(double * LeftMatrix, double * RightMatrix, int N, int L, int M)
 				for(int j0=0;j0<M;j0+=jstride)
 				{
 					int jtop = MIN(jstride,M-j0);
-					for(i=0;i<itop*jtop;i++)
+					int jstep = (jtop+1)&~1;
+
+					for(i=0;i<itop*jstep;i++)
 						sums[i] = 0.0;
 					for(k=0;k<L;k++)
 					{
 						double *pright = RightMatrix + k*M + j0;
 						for(j=0;j<jtop;j++)
 							right[j] = pright[j];
+#ifdef __SSE2__						
+						if (j < jstep)
+							right[j] = 0.0;
+#endif
 						for(i=0;i<itop;i++)
 						{
 							double left = LeftMatrix[(i+i0)*L+k];
-							double *psums = sums + i*jtop;
+							double *psums = sums + i*jstep;
+#ifdef __SSE2__
+							__m128d left2 = _mm_set1_pd(left);
+
+#define 					COMPUTE(d) _mm_store_pd(psums+j+d,\
+									 _mm_add_pd(_mm_load_pd(psums+j+d),\
+									 _mm_mul_pd(left2, _mm_load_pd(right+j+d))))
+							for(j=0;j<jstep-14;j+=16) {
+								COMPUTE(0);
+								COMPUTE(2);
+								COMPUTE(4);
+								COMPUTE(6);
+								COMPUTE(8);
+								COMPUTE(10);
+								COMPUTE(12);
+								COMPUTE(14);
+							}
+							for(;j<jstep;j+=2)
+								COMPUTE(0);
+#else
 							for(j=0;j<jtop;j++)
 								psums[j] += left*right[j];
+#endif
 						}
 					}
-					for(i=0;i<itop*jtop;i++)
+					for(i=0;i<itop*jstep;i++)
 						Result += fabs(sums[i]);
 				}
 			}
 		}
 	}
 	
-	delete sums;
+	_aligned_free(sums);
 	return(Result);
 }
 
