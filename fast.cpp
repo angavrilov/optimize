@@ -66,22 +66,47 @@ double GetResult(double * LeftMatrix, double * RightMatrix, int N, int L, int M)
 					for(k=0;k<L;k++)
 					{
 						double *pright = RightMatrix + k*M + j0;
-#ifdef __SSE2__						
-						_mm_prefetch(sums, _MM_HINT_T0);
-						_mm_prefetch(sums+8, _MM_HINT_T0);
-#endif
+#ifdef __SSE2__
+						double *pnext = pright+M;
+						_mm_prefetch(pright, _MM_HINT_T0);
+						_mm_prefetch(pnext, _MM_HINT_T1);
+
+#define 				COPY(d,lcmd) _mm_store_pd(right+j+d,lcmd(pright+j+d))
+#define					COPY_LOOPS(lcmd) \
+							for(j=0;j<jtop-7;j+=8) { \
+								_mm_prefetch(pright+j+8, _MM_HINT_T0); \
+								_mm_prefetch(pnext+j, _MM_HINT_T1); \
+								COPY(0, lcmd); COPY(2, lcmd); \
+								COPY(4, lcmd); COPY(6, lcmd); \
+							} \
+							_mm_prefetch(sums, _MM_HINT_T0); \
+							_mm_prefetch(sums+8, _MM_HINT_T0); \
+							_mm_prefetch(LeftMatrix+(i*10)*L+k, _MM_HINT_T0); \
+							for(;j<jtop-1;j+=2) \
+								COPY(0, lcmd);
+
+						if (((long)pright)&0xF) {
+							COPY_LOOPS(_mm_loadu_pd);
+						} else {
+							COPY_LOOPS(_mm_load_pd);
+						}
+						if (j < jtop) {
+							right[j] = pright[j];
+							right[j+1] = 0.0;
+						}
+#else
 						for(j=0;j<jtop;j++)
 							right[j] = pright[j];
-#ifdef __SSE2__						
-						if (j < jstep)
-							right[j] = 0.0;
 #endif
 						for(i=0;i<itop;i++)
 						{
-							double left = LeftMatrix[(i+i0)*L+k];
+							double *pleft = LeftMatrix+(i+i0)*L+k;
+							double left = *pleft;
 							double *psums = sums + i*jstep;
 #ifdef __SSE2__
 							__m128d left2 = _mm_set1_pd(left);
+
+							_mm_prefetch(pleft+L, _MM_HINT_T0);
 
 #define 					COMPUTE(d) _mm_store_pd(psums+j+d,\
 									 _mm_add_pd(_mm_load_pd(psums+j+d),\
