@@ -3,6 +3,10 @@
 #include <math.h>
 #include <sys/timeb.h>
 
+#define L1_CACHE 32768
+#define JSTRIDE (L1_CACHE/sizeof(double)/2)
+#define MIN(a,b) (((a)<(b))?(a):(b))
+
 double GetResult(double * LeftMatrix, double * RightMatrix, int N, int L, int M)
 {
 	// матрица LeftMatrix хранится по строкам
@@ -16,24 +20,26 @@ double GetResult(double * LeftMatrix, double * RightMatrix, int N, int L, int M)
 	int j=0;
 	int k=0;
 	double Result=0.0;
-	double *sums = new double[M];
+	double sums[JSTRIDE];
 
 	{
 		{
 			{
+				for(int j0=0;j0<M;j0+=JSTRIDE)
 				{
+					int jtop = MIN(JSTRIDE,M-j0);
 					for(i=0;i<N;i++)
 					{
-						for(j=0;j<M;j++)
+						for(j=0;j<jtop;j++)
 							sums[j] = 0.0;
 						for(k=0;k<L;k++)
 						{
 							double left = LeftMatrix[i*L+k];
-							double *pright = RightMatrix + k*M;
-							for(j=0;j<M;j++)
+							double *pright = RightMatrix + k*M + j0;
+							for(j=0;j<jtop;j++)
 								sums[j] += left*pright[j];
 						}
-						for(j=0;j<M;j++)
+						for(j=0;j<jtop;j++)
 							Result += fabs(sums[j]);
 					}
 				}
@@ -41,8 +47,6 @@ double GetResult(double * LeftMatrix, double * RightMatrix, int N, int L, int M)
 		}
 	}
 	
-
-	delete sums;
 	return(Result);
 }
 
