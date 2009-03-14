@@ -15,26 +15,34 @@ double GetResult(double * LeftMatrix, double * RightMatrix, int N, int L, int M)
 	int i=0;
 	int j=0;
 	int k=0;
-	int leftindex=0;
-	int rightindex=0;
-	double sum=0.0;
 	double Result=0.0;
+	double *sums = new double[M];
 
-	for(i=0;i<N;i++)
 	{
-		for(j=0;j<M;j++)
 		{
-			sum=0.0;
-			for(k=0;k<L;k++)
 			{
-				leftindex=i*L+k;
-				rightindex=k*M+j;
-				sum+=LeftMatrix[leftindex]*RightMatrix[rightindex];
+				{
+					for(i=0;i<N;i++)
+					{
+						for(j=0;j<M;j++)
+							sums[j] = 0.0;
+						for(k=0;k<L;k++)
+						{
+							double left = LeftMatrix[i*L+k];
+							double *pright = RightMatrix + k*M;
+							for(j=0;j<M;j++)
+								sums[j] += left*pright[j];
+						}
+						for(j=0;j<M;j++)
+							Result += fabs(sums[j]);
+					}
+				}
 			}
-			Result+=fabs(sum);
 		}
 	}
+	
 
+	delete sums;
 	return(Result);
 }
 
