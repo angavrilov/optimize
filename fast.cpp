@@ -4,6 +4,10 @@
 #include <sys/timeb.h>
 
 #define L1_CACHE 32768
+#define L2_CACHE (2*1048576)
+#define TLB_SIZE 256
+#define VALS_PER_LINE 8
+#define VALS_PER_PAGE 512
 #define JSTRIDE (L1_CACHE/sizeof(double)/2)
 #define MIN(a,b) (((a)<(b))?(a):(b))
 
@@ -22,13 +26,23 @@ double GetResult(double * LeftMatrix, double * RightMatrix, int N, int L, int M)
 	double Result=0.0;
 	double sums[JSTRIDE];
 
+	int jstride = MIN(JSTRIDE,L2_CACHE/sizeof(double)/L/3);
+	int istride = MIN(L2_CACHE/sizeof(double)/L/3, TLB_SIZE/2);
+	
+	if (jstride%VALS_PER_LINE)
+		jstride += VALS_PER_LINE-(jstride%VALS_PER_LINE);
+	if ((jstride%VALS_PER_PAGE) < VALS_PER_PAGE/4 && jstride > VALS_PER_PAGE)
+		jstride -= jstride%VALS_PER_PAGE;
+	
 	{
 		{
+			for(int i0=0;i0<N;i0+=istride)
 			{
-				for(int j0=0;j0<M;j0+=JSTRIDE)
+				int itop = MIN(i0+istride,N);
+				for(int j0=0;j0<M;j0+=jstride)
 				{
-					int jtop = MIN(JSTRIDE,M-j0);
-					for(i=0;i<N;i++)
+					int jtop = MIN(jstride,M-j0);
+					for(i=i0;i<itop;i++)
 					{
 						for(j=0;j<jtop;j++)
 							sums[j] = 0.0;
