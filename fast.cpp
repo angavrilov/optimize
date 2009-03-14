@@ -12,7 +12,15 @@
 #error Please enable SSE2
 #endif
 #endif
- 
+
+#ifdef _OPENMP
+#include <omp.h>
+#else
+#ifndef NO_OPENMP
+#error Please enable OpenMP
+#endif
+#endif
+
 #define L1_CACHE 32768
 #define L2_CACHE (2*1048576)
 #define TLB_SIZE 256
@@ -41,8 +49,7 @@ double GetResult(double * LeftMatrix, double * RightMatrix, int N, int L, int M)
 	int j=0;
 	int k=0;
 	double Result=0.0;
-	ALIGN16(double right[VALS_PER_PAGE]);
-	
+
 	int jstride = VALS_PER_PAGE;
 	int istride = MIN(L2_CACHE*3/sizeof(double)/(jstride+L)/4, TLB_SIZE*3/4/2);
 
@@ -50,19 +57,37 @@ double GetResult(double * LeftMatrix, double * RightMatrix, int N, int L, int M)
 	if (jstride > M) jstride = M;
 	
 	double *sums = (double*)_aligned_alloc(istride*jstride*sizeof(double),16);
-		
+
+#pragma omp parallel private(i,j,k) reduction(+: Result)
 	{
+#ifdef _OPENMP
+		int threads = omp_get_num_threads();
+		int threadid = omp_get_thread_num();
+#endif
+
+		ALIGN16(double right[VALS_PER_PAGE]);
+	
 		{
 			for(int i0=0;i0<N;i0+=istride)
 			{
 				int itop = MIN(istride,N-i0);
+#ifdef _OPENMP
+				int istart = itop*threadid/threads;
+				int iend = itop*(threadid+1)/threads;
+#define ISTART istart
+#define IEND iend
+#else
+#define ISTART 0
+#define IEND itop
+#endif
 				for(int j0=0;j0<M;j0+=jstride)
 				{
 					int jtop = MIN(jstride,M-j0);
 					int jstep = (jtop+1)&~1;
-
-					for(i=0;i<itop*jstep;i++)
+					
+					for(i=ISTART*jstep;i<IEND*jstep;i++)
 						sums[i] = 0.0;
+
 					for(k=0;k<L;k++)
 					{
 						double *pright = RightMatrix + k*M + j0;
@@ -81,7 +106,7 @@ double GetResult(double * LeftMatrix, double * RightMatrix, int N, int L, int M)
 							} \
 							_mm_prefetch(sums, _MM_HINT_T0); \
 							_mm_prefetch(sums+8, _MM_HINT_T0); \
-							_mm_prefetch(LeftMatrix+(i*10)*L+k, _MM_HINT_T0); \
+							_mm_prefetch(LeftMatrix+(i0+ISTART)*L+k, _MM_HINT_T0); \
 							for(;j<jtop-1;j+=2) \
 								COPY(0, lcmd);
 
@@ -98,7 +123,7 @@ double GetResult(double * LeftMatrix, double * RightMatrix, int N, int L, int M)
 						for(j=0;j<jtop;j++)
 							right[j] = pright[j];
 #endif
-						for(i=0;i<itop;i++)
+						for(i=ISTART;i<IEND;i++)
 						{
 							double *pleft = LeftMatrix+(i+i0)*L+k;
 							double left = *pleft;
@@ -131,8 +156,10 @@ double GetResult(double * LeftMatrix, double * RightMatrix, int N, int L, int M)
 #endif
 						}
 					}
-					for(i=0;i<itop*jstep;i++)
+
+					for(i=ISTART*jstep;i<IEND*jstep;i++)
 						Result += fabs(sums[i]);
+#pragma omp barrier
 				}
 			}
 		}
