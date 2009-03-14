@@ -8,7 +8,6 @@
 #define TLB_SIZE 256
 #define VALS_PER_LINE 8
 #define VALS_PER_PAGE 512
-#define JSTRIDE (L1_CACHE/sizeof(double)/2)
 #define MIN(a,b) (((a)<(b))?(a):(b))
 
 double GetResult(double * LeftMatrix, double * RightMatrix, int N, int L, int M)
@@ -24,43 +23,44 @@ double GetResult(double * LeftMatrix, double * RightMatrix, int N, int L, int M)
 	int j=0;
 	int k=0;
 	double Result=0.0;
-	double sums[JSTRIDE];
-
-	int jstride = MIN(JSTRIDE,L2_CACHE/sizeof(double)/L/3);
-	int istride = MIN(L2_CACHE/sizeof(double)/L/3, TLB_SIZE/2);
 	
-	if (jstride%VALS_PER_LINE)
-		jstride += VALS_PER_LINE-(jstride%VALS_PER_LINE);
-	if ((jstride%VALS_PER_PAGE) < VALS_PER_PAGE/4 && jstride > VALS_PER_PAGE)
-		jstride -= jstride%VALS_PER_PAGE;
+	int jstride = VALS_PER_PAGE;
+	int istride = MIN(L2_CACHE*3/sizeof(double)/(jstride+L)/4, TLB_SIZE*3/4/2);
+
+	if (istride > N) istride = N;
+	if (jstride > M) jstride = M;
+	
+	double *sums = new double[istride*jstride];
 	
 	{
 		{
 			for(int i0=0;i0<N;i0+=istride)
 			{
-				int itop = MIN(i0+istride,N);
+				int itop = MIN(istride,N-i0);
 				for(int j0=0;j0<M;j0+=jstride)
 				{
 					int jtop = MIN(jstride,M-j0);
-					for(i=i0;i<itop;i++)
+					for(i=0;i<itop*jtop;i++)
+						sums[i] = 0.0;
+					for(k=0;k<L;k++)
 					{
-						for(j=0;j<jtop;j++)
-							sums[j] = 0.0;
-						for(k=0;k<L;k++)
+						double *pright = RightMatrix + k*M + j0;
+						for(i=0;i<itop;i++)
 						{
-							double left = LeftMatrix[i*L+k];
-							double *pright = RightMatrix + k*M + j0;
+							double left = LeftMatrix[(i+i0)*L+k];
+							double *psums = sums + i*jtop;
 							for(j=0;j<jtop;j++)
-								sums[j] += left*pright[j];
+								psums[j] += left*pright[j];
 						}
-						for(j=0;j<jtop;j++)
-							Result += fabs(sums[j]);
 					}
+					for(i=0;i<itop*jtop;i++)
+						Result += fabs(sums[i]);
 				}
 			}
 		}
 	}
 	
+	delete sums;
 	return(Result);
 }
 
