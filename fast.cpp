@@ -63,6 +63,8 @@ double GetResult(double * LeftMatrix, double * RightMatrix, int N, int L, int M)
 #ifdef _OPENMP
 		int threads = omp_get_num_threads();
 		int threadid = omp_get_thread_num();
+		int ibase = istride*threadid/threads;
+		double *bsums = sums + jstride*ibase;
 #endif
 
 		ALIGN16(double right[VALS_PER_PAGE]);
@@ -84,6 +86,9 @@ double GetResult(double * LeftMatrix, double * RightMatrix, int N, int L, int M)
 				{
 					int jtop = MIN(jstride,M-j0);
 					int jstep = (jtop+1)&~1;
+#ifdef _OPENMP
+					double *sums = bsums - jstep*istart;
+#endif
 					
 					for(i=ISTART*jstep;i<IEND*jstep;i++)
 						sums[i] = 0.0;
@@ -159,7 +164,6 @@ double GetResult(double * LeftMatrix, double * RightMatrix, int N, int L, int M)
 
 					for(i=ISTART*jstep;i<IEND*jstep;i++)
 						Result += fabs(sums[i]);
-#pragma omp barrier
 				}
 			}
 		}
