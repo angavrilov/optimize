@@ -76,6 +76,7 @@ double GetResult(double * LeftMatrix, double * RightMatrix, int N, int L, int M)
 #ifdef _OPENMP
 				int istart = itop*threadid/threads;
 				int iend = itop*(threadid+1)/threads;
+				if (iend <= istart) break;
 #define ISTART istart
 #define IEND iend
 #else
@@ -105,7 +106,7 @@ double GetResult(double * LeftMatrix, double * RightMatrix, int N, int L, int M)
 #define					COPY_LOOPS(lcmd) \
 							for(j=0;j<jtop-7;j+=8) { \
 								_mm_prefetch(pright+j+8, _MM_HINT_T0); \
-								_mm_prefetch(pnext+j, _MM_HINT_T1); \
+								_mm_prefetch(pnext+j+8, _MM_HINT_T1); \
 								COPY(0, lcmd); COPY(2, lcmd); \
 								COPY(4, lcmd); COPY(6, lcmd); \
 							} \
