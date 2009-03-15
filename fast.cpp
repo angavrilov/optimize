@@ -110,8 +110,8 @@ double GetResult(double * LeftMatrix, double * RightMatrix, int N, int L, int M)
 								COPY(0, lcmd); COPY(2, lcmd); \
 								COPY(4, lcmd); COPY(6, lcmd); \
 							} \
-							_mm_prefetch(sums, _MM_HINT_T0); \
-							_mm_prefetch(sums+8, _MM_HINT_T0); \
+							_mm_prefetch(sums+16, _MM_HINT_T0); \
+							_mm_prefetch(sums+8+16, _MM_HINT_T0); \
 							_mm_prefetch(LeftMatrix+(i0+ISTART)*L+k, _MM_HINT_T0); \
 							for(;j<jtop-1;j+=2) \
 								COPY(0, lcmd);
@@ -143,12 +143,12 @@ double GetResult(double * LeftMatrix, double * RightMatrix, int N, int L, int M)
 									 _mm_add_pd(_mm_load_pd(psums+j+d),\
 									 _mm_mul_pd(left2, _mm_load_pd(right+j+d))))
 							for(j=0;j<jstep-14;j+=16) {
-								_mm_prefetch(psums+j+16, _MM_HINT_T0);
+								_mm_prefetch(psums+j+16+16, _MM_HINT_T0);
 								COMPUTE(0);
 								COMPUTE(2);
 								COMPUTE(4);
 								COMPUTE(6);
-								_mm_prefetch(psums+j+24, _MM_HINT_T0);
+								_mm_prefetch(psums+j+24+16, _MM_HINT_T0);
 								COMPUTE(8);
 								COMPUTE(10);
 								COMPUTE(12);
