@@ -2,8 +2,60 @@
 #include <stdlib.h>
 #include <sys/timeb.h>
 
+#if defined(_M_IX86_FP) && _M_IX86_FP >= 2
+#define __SSE2__
+#endif
+
+#ifdef __SSE2__
+#include <emmintrin.h>
+#else
+#ifndef NO_SSE
+#error Please enable SSE2
+#endif
+#endif
+
 #define KSTRIDE 512
 #define MIN(a,b) (((a)<(b))?(a):(b))
+
+#ifdef __SSE2__
+#define SUM_LOOP(idx,limit,target,ptr,expr,exprsse) \
+	{ \
+		double temp[2]; \
+		__m128d _s1 = _mm_set1_pd(0.0); \
+		__m128d _s2 = _mm_set1_pd(0.0); \
+		__m128d _s3 = _mm_set1_pd(0.0); \
+		__m128d _s4 = _mm_set1_pd(0.0); \
+		int _l2 = limit & ~1; \
+		if (((long)ptr)&0xF) { \
+			for(idx=0;idx<_l2-6;idx+=8) { \
+				_s1 = _mm_add_pd(_s1, exprsse(_mm_loadu_pd,0)); \
+				_s2 = _mm_add_pd(_s2, exprsse(_mm_loadu_pd,2)); \
+				_s3 = _mm_add_pd(_s3, exprsse(_mm_loadu_pd,4)); \
+				_s4 = _mm_add_pd(_s4, exprsse(_mm_loadu_pd,6)); \
+			} \
+			for(;idx<_l2;idx+=2) \
+				_s1 = _mm_add_pd(_s1, exprsse(_mm_loadu_pd,0)); \
+		} else { \
+			for(idx=0;idx<_l2-6;idx+=8) { \
+				_s1 = _mm_add_pd(_s1, exprsse(_mm_load_pd,0)); \
+				_s2 = _mm_add_pd(_s2, exprsse(_mm_load_pd,2)); \
+				_s3 = _mm_add_pd(_s3, exprsse(_mm_load_pd,4)); \
+				_s4 = _mm_add_pd(_s4, exprsse(_mm_load_pd,6)); \
+			} \
+			for(;idx<_l2;idx+=2) \
+				_s1 = _mm_add_pd(_s1, exprsse(_mm_load_pd,0)); \
+		} \
+		_mm_storeu_pd(temp, _mm_add_pd(_mm_add_pd(_s1,_s2),_mm_add_pd(_s3,_s4))); \
+		target += temp[0]+temp[1]; \
+		if (limit & 1) { \
+			idx = limit-1; \
+			target += expr; \
+		} \
+	}
+#else
+#define SUM_LOOP(idx,limit,target,ptr,expr,exprsse) \
+	for (idx=0;idx<limit;idx++) target += expr;
+#endif
 
 double GetResult(double * LeftMatrix, double * RightMatrix, int N, int L, int M)
 {
@@ -24,18 +76,16 @@ double GetResult(double * LeftMatrix, double * RightMatrix, int N, int L, int M)
 		for(k=0;k<ktop;k++) {
 			double jsum = 0.0;
 			double *pright = RightMatrix + (k0+k)*M;
-			for(j=0;j<M;j++)
-				jsum+=pright[j];
+#define SSEXPR1(load,off) load(pright+j+off)
+			SUM_LOOP(j,M,jsum,pright,pright[j],SSEXPR1)
 			jrows[k]=jsum;
 		}
 
 		for(i=0;i<N;i++)
 		{
 			double *pleft = LeftMatrix + i*L + k0;
-			for(k=0;k<ktop;k++)
-			{
-				sum += pleft[k]*jrows[k];
-			}
+#define SSEXPR2(load,off) _mm_mul_pd(load(pleft+k+off),_mm_load_pd(jrows+k+off))
+			SUM_LOOP(k,ktop,sum,pleft,pleft[k]*jrows[k],SSEXPR2)
 		}
 	}
 
