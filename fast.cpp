@@ -62,6 +62,8 @@ double GetResult(double * LeftMatrix, double * RightMatrix, int N, int L, int M)
 	__m128d sum3 = _mm_set1_pd(0.0);
 	__m128d sum4 = _mm_set1_pd(0.0);
 	__m128d sum5 = _mm_set1_pd(0.0);
+	__m128d sum6 = _mm_set1_pd(0.0);
+	__m128d sum7 = _mm_set1_pd(0.0);
 #endif
 
 	for(k0=0;k0<L;k0+=kstride) {
@@ -89,26 +91,30 @@ double GetResult(double * LeftMatrix, double * RightMatrix, int N, int L, int M)
 #ifdef __SSE2__
 				__m128d left2 = _mm_set1_pd(left);
 				if (((long)pright)&0xF) {
-					for(j=0;j<jtop-6;j+=8) {
+					for(j=0;j<jtop-10;j+=12) {
 						sum2 = _mm_add_pd(sum2, _mm_mul_pd(left2, _mm_loadu_pd(pright+j)));
 						sum3 = _mm_add_pd(sum3, _mm_mul_pd(left2, _mm_loadu_pd(pright+j+2)));
 						sum4 = _mm_add_pd(sum4, _mm_mul_pd(left2, _mm_loadu_pd(pright+j+4)));
 						sum5 = _mm_add_pd(sum5, _mm_mul_pd(left2, _mm_loadu_pd(pright+j+6)));
+						sum6 = _mm_add_pd(sum6, _mm_mul_pd(left2, _mm_loadu_pd(pright+j+8)));
+						sum7 = _mm_add_pd(sum7, _mm_mul_pd(left2, _mm_loadu_pd(pright+j+10)));
 					}
 					for(;j<jtop;j+=2)
 						sum2 = _mm_add_pd(sum2, _mm_mul_pd(left2, _mm_loadu_pd(pright+j)));
 				} else {
-					for(j=0;j<jtop-6;j+=8) {
+					for(j=0;j<jtop-10;j+=12) {
 						sum2 = _mm_add_pd(sum2, _mm_mul_pd(left2, _mm_load_pd(pright+j)));
 						sum3 = _mm_add_pd(sum3, _mm_mul_pd(left2, _mm_load_pd(pright+j+2)));
 						sum4 = _mm_add_pd(sum4, _mm_mul_pd(left2, _mm_load_pd(pright+j+4)));
 						sum5 = _mm_add_pd(sum5, _mm_mul_pd(left2, _mm_load_pd(pright+j+6)));
+						sum6 = _mm_add_pd(sum6, _mm_mul_pd(left2, _mm_load_pd(pright+j+8)));
+						sum7 = _mm_add_pd(sum7, _mm_mul_pd(left2, _mm_load_pd(pright+j+10)));
 					}
 					for(;j<jtop;j+=2)
 						sum2 = _mm_add_pd(sum2, _mm_mul_pd(left2, _mm_load_pd(pright+j)));
 				}
 				if (MX2)
-					sum += left*pright[MX2-1];
+					sum3 = _mm_add_sd(sum3, _mm_mul_sd(left2, _mm_load_sd(pright+MX2-1)));
 #else
 				double s1=0,s2=0,s3=0,s4=0;
 				for(j=0;j<jtop-3;j+=4) {
@@ -128,7 +134,7 @@ double GetResult(double * LeftMatrix, double * RightMatrix, int N, int L, int M)
 	}
 
 #ifdef __SSE2__
-	_mm_storeu_pd(temp, _mm_add_pd(_mm_add_pd(sum2,sum3),_mm_add_pd(sum4,sum5)));
+	_mm_storeu_pd(temp, _mm_add_pd(_mm_add_pd(sum2,_mm_add_pd(sum3,sum6)),_mm_add_pd(sum4,_mm_add_pd(sum5,sum7))));
 	sum += temp[0]+temp[1];
 #endif
     }
