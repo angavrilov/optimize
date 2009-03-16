@@ -56,7 +56,7 @@ double GetResult(double * LeftMatrix, double * RightMatrix, int N, int L, int M)
 	double Result=0.0;
 
 	int jstride = VALS_PER_PAGE;
-	int istride = MIN(L2_CACHE*3/sizeof(double)/(jstride+L)/4, TLB_SIZE*3/4/2);
+	int istride = MIN(L2_CACHE*8/sizeof(double)/(jstride+L)/4, TLB_SIZE*7/8/2);
 
 	if (istride > N) istride = N;
 	if (jstride > M) jstride = M;
