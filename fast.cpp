@@ -4,6 +4,10 @@
 #include <malloc.h>
 #include <sys/timeb.h>
 
+#if defined(_M_IX86_FP) && _M_IX86_FP >= 2
+#define __SSE2__
+#endif  
+
 #ifdef __SSE2__
 #include <xmmintrin.h>
 #include <emmintrin.h>
@@ -30,10 +34,11 @@
 
 #ifdef __GNUC__
 #define ALIGN16(x) x __attribute__((aligned(16)))
-#define _aligned_alloc(size,alignment) memalign(alignment,size)
+#define _aligned_malloc(size,alignment) memalign(alignment,size)
 #define _aligned_free(ptr) free(ptr)
 #else
 #define ALIGN16(x) __declspec(align(16)) x
+#define _mm_prefetch(p,v) _mm_prefetch((char*)p,v)
 #endif
 
 double GetResult(double * LeftMatrix, double * RightMatrix, int N, int L, int M)
@@ -56,7 +61,7 @@ double GetResult(double * LeftMatrix, double * RightMatrix, int N, int L, int M)
 	if (istride > N) istride = N;
 	if (jstride > M) jstride = M;
 	
-	double *sums = (double*)_aligned_alloc(istride*jstride*sizeof(double),16);
+	double *sums = (double*)_aligned_malloc(istride*jstride*sizeof(double),16);
 
 #pragma omp parallel private(i,j,k) reduction(+: Result)
 	{
